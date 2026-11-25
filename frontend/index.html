@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NeuroScan Vision – Aide à la visualisation oncologique</title>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  CRITÈRES BASTIEN & SCAPIN – RÉFÉRENCE RAPIDE                       ║
+  ║  B&S-1  Guidage              B&S-5  Gestion des erreurs             ║
+  ║  B&S-2  Charge de travail    B&S-6  Homogénéité / Cohérence         ║
+  ║  B&S-3  Contrôle explicite   B&S-7  Signifiance des codes           ║
+  ║  B&S-4  Adaptabilité         B&S-8  Compatibilité                   ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS  — B&S-6 Homogénéité : une seule source de vérité
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --clr-bg:        #0d1117;
+  --clr-surface:   #161b22;
+  --clr-surface2:  #21262d;
+  --clr-border:    #30363d;
+  --clr-primary:   #2f81f7;
+  --clr-primary-h: #388bfd;
+  --clr-success:   #3fb950;
+  --clr-warning:   #d29922;
+  --clr-danger:    #f85149;
+  --clr-text:      #e6edf3;
+  --clr-text-muted:#8b949e;
+  --clr-tumor:     #ff4d4d;
+  --radius:        10px;
+  --shadow:        0 4px 24px rgba(0,0,0,.45);
+  --transition:    .2s ease;
+  --font:          'Segoe UI', system-ui, sans-serif;
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--clr-bg);
+  color:var(--clr-text);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────── */
+.app-header{
+  background:var(--clr-surface);
+  border-bottom:1px solid var(--clr-border);
+  padding:1rem 2rem;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  position:sticky;top:0;z-index:10;
+}
+.app-header .logo{font-size:1.5rem;font-weight:700;letter-spacing:-.5px}
+.app-header .logo span{color:var(--clr-primary)}
+.server-badge{
+  margin-left:auto;
+  font-size:.72rem;
+  padding:.25rem .6rem;
+  border-radius:999px;
+  border:1px solid var(--clr-border);
+  color:var(--clr-text-muted);
+}
+.server-badge.mock{border-color:var(--clr-warning);color:var(--clr-warning)}
+.server-badge.prod{border-color:var(--clr-success);color:var(--clr-success)}
+
+main{
+  flex:1;
+  max-width:1100px;
+  margin:0 auto;
+  padding:2rem 1.5rem;
+  width:100%;
+}
+
+/* ─── Disclaimer — B&S-8 Compatibilité ──────────────────────────────── */
+.disclaimer{
+  background:rgba(210,153,34,.08);
+  border:1px solid rgba(210,153,34,.35);
+  border-radius:var(--radius);
+  padding:.85rem 1.2rem;
+  font-size:.82rem;
+  color:var(--clr-warning);
+  margin-bottom:1.75rem;
+  display:flex;gap:.6rem;align-items:flex-start;
+}
+.disclaimer svg{flex-shrink:0;margin-top:1px}
+
+/* ─── Stepper — B&S-1 Guidage ──────────────────────────────────────── */
+.stepper{
+  display:flex;
+  gap:0;
+  margin-bottom:2rem;
+  counter-reset:step;
+}
+.step{
+  flex:1;
+  display:flex;
+  align-items:center;
+  gap:.6rem;
+  padding:.7rem 1rem;
+  background:var(--clr-surface);
+  border:1px solid var(--clr-border);
+  font-size:.82rem;
+  color:var(--clr-text-muted);
+  position:relative;
+  transition:var(--transition);
+}
+.step:first-child{border-radius:var(--radius) 0 0 var(--radius)}
+.step:last-child {border-radius:0 var(--radius) var(--radius) 0}
+.step:not(:last-child)::after{
+  content:'';
+  position:absolute;right:-12px;top:50%;
+  transform:translateY(-50%);
+  border:6px solid transparent;
+  border-left-color:var(--clr-border);
+  z-index:1;
+}
+.step .num{
+  width:24px;height:24px;
+  border-radius:50%;
+  background:var(--clr-surface2);
+  border:1px solid var(--clr-border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:700;flex-shrink:0;
+  transition:var(--transition);
+}
+.step.active{
+  background:var(--clr-surface2);
+  border-color:var(--clr-primary);
+  color:var(--clr-text);
+}
+.step.active .num{background:var(--clr-primary);border-color:var(--clr-primary);color:#fff}
+.step.done{border-color:var(--clr-success);color:var(--clr-success)}
+.step.done .num{background:var(--clr-success);border-color:var(--clr-success);color:#fff}
+
+/* ─── Upload zone — B&S-1 Guidage, B&S-3 Contrôle explicite ────────── */
+.upload-card{
+  background:var(--clr-surface);
+  border:2px dashed var(--clr-border);
+  border-radius:var(--radius);
+  padding:3rem 2rem;
+  text-align:center;
+  cursor:pointer;
+  transition:var(--transition);
+  position:relative;
+}
+.upload-card:hover,.upload-card.drag-over{
+  border-color:var(--clr-primary);
+  background:rgba(47,129,247,.06);
+}
+.upload-card input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+.upload-icon{font-size:3rem;margin-bottom:.75rem;display:block}
+.upload-hint{color:var(--clr-text-muted);font-size:.88rem;margin-top:.4rem}
+.preview-wrap{
+  margin-top:1.5rem;
+  display:none;
+  align-items:center;gap:1rem;
+  background:var(--clr-surface2);
+  border:1px solid var(--clr-border);
+  border-radius:var(--radius);
+  padding:.75rem 1rem;
+}
+.preview-wrap img{width:60px;height:60px;object-fit:cover;border-radius:6px}
+.preview-info{text-align:left;flex:1}
+.preview-info .fname{font-size:.9rem;font-weight:600;word-break:break-all}
+.preview-info .fsize{font-size:.78rem;color:var(--clr-text-muted);margin-top:2px}
+
+/* ─── Actions — B&S-3 Contrôle explicite ───────────────────────────── */
+.actions{display:flex;gap:.75rem;margin-top:1.5rem;flex-wrap:wrap}
+.btn{
+  padding:.6rem 1.4rem;
+  border-radius:var(--radius);
+  border:none;
+  font-size:.9rem;font-weight:600;
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:.45rem;
+  transition:var(--transition);
+}
+.btn-primary{background:var(--clr-primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--clr-primary-h)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{
+  background:transparent;
+  color:var(--clr-text-muted);
+  border:1px solid var(--clr-border);
+}
+.btn-ghost:hover{background:var(--clr-surface2);color:var(--clr-text)}
+
+/* ─── Loader — B&S-1 Guidage ──────────────────────────────────────── */
+.loader-wrap{
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  gap:1rem;
+  padding:2.5rem 0;
+}
+.spinner{
+  width:48px;height:48px;
+  border:4px solid var(--clr-border);
+  border-top-color:var(--clr-primary);
+  border-radius:50%;
+  animation:spin .9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-label{color:var(--clr-text-muted);font-size:.88rem}
+
+/* ─── Error — B&S-5 Gestion des erreurs ──────────────────────────── */
+.error-box{
+  display:none;
+  background:rgba(248,81,73,.08);
+  border:1px solid rgba(248,81,73,.4);
+  border-radius:var(--radius);
+  padding:1rem 1.2rem;
+  color:var(--clr-danger);
+  font-size:.88rem;
+  gap:.6rem;
+  align-items:flex-start;
+  margin-top:1.5rem;
+}
+.error-box svg{flex-shrink:0}
+
+/* ─── Results ───────────────────────────────────────────────────────── */
+.result-section{display:none;margin-top:2rem;animation:fadeUp .4s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* Verdict badge — B&S-7 Signifiance ─────────────────────────────────── */
+.verdict{
+  border-radius:var(--radius);
+  padding:1.2rem 1.5rem;
+  margin-bottom:1.5rem;
+  display:flex;align-items:center;gap:1rem;
+}
+.verdict.normal{
+  background:rgba(63,185,80,.09);
+  border:1px solid rgba(63,185,80,.35);
+}
+.verdict.cancer{
+  background:rgba(248,81,73,.09);
+  border:1px solid rgba(248,81,73,.35);
+}
+.verdict.uncertain{
+  background:rgba(210,153,34,.09);
+  border:1px solid rgba(210,153,34,.35);
+}
+.verdict-icon{font-size:2.5rem;flex-shrink:0}
+.verdict-title{font-size:1.1rem;font-weight:700;margin-bottom:.2rem}
+.verdict-sub{font-size:.82rem;color:var(--clr-text-muted)}
+.verdict.normal .verdict-title{color:var(--clr-success)}
+.verdict.cancer .verdict-title{color:var(--clr-danger)}
+.verdict.uncertain .verdict-title{color:var(--clr-warning)}
+
+/* Score bars — B&S-7 Signifiance ────────────────────────────────────── */
+.scores-card{
+  background:var(--clr-surface);
+  border:1px solid var(--clr-border);
+  border-radius:var(--radius);
+  padding:1.2rem 1.5rem;
+  margin-bottom:1.5rem;
+}
+.scores-card h3{font-size:.88rem;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--clr-text-muted);margin-bottom:1rem}
+.score-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem}
+.score-label{width:160px;font-size:.85rem;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score-bar-wrap{flex:1;background:var(--clr-surface2);border-radius:999px;height:8px;overflow:hidden}
+.score-bar{height:100%;border-radius:999px;transition:width .6s ease;background:var(--clr-primary)}
+.score-bar.top{background:var(--clr-danger)}
+.score-pct{width:42px;text-align:right;font-size:.82rem;font-variant-numeric:tabular-nums;color:var(--clr-text-muted)}
+
+/* Image comparison — B&S-4 Adaptabilité ────────────────────────────── */
+.images-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1rem;
+  margin-bottom:1.5rem;
+}
+.images-grid.single{grid-template-columns:1fr;max-width:420px;margin:0 auto 1.5rem}
+.img-card{
+  background:var(--clr-surface);
+  border:1px solid var(--clr-border);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.img-card-header{
+  padding:.6rem 1rem;
+  background:var(--clr-surface2);
+  border-bottom:1px solid var(--clr-border);
+  font-size:.8rem;
+  font-weight:600;
+  display:flex;align-items:center;gap:.5rem;
+}
+.img-card img{width:100%;display:block;object-fit:contain;max-height:320px;background:#000}
+
+/* Overlay opacity slider — B&S-3 Contrôle explicite ─────────────────── */
+.overlay-controls{
+  display:none;
+  background:var(--clr-surface);
+  border:1px solid var(--clr-border);
+  border-radius:var(--radius);
+  padding:1rem 1.5rem;
+  margin-bottom:1.5rem;
+  align-items:center;gap:1rem;flex-wrap:wrap;
+}
+.overlay-controls label{font-size:.85rem;color:var(--clr-text-muted);min-width:140px}
+.overlay-controls input[type=range]{
+  flex:1;min-width:120px;
+  -webkit-appearance:none;appearance:none;
+  height:6px;border-radius:999px;
+  background:var(--clr-surface2);outline:none;
+  cursor:pointer;
+}
+.overlay-controls input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--clr-primary);cursor:pointer;
+  box-shadow:0 0 6px rgba(47,129,247,.5);
+}
+.overlay-controls .pct-display{font-weight:600;min-width:36px;text-align:right}
+
+/* Legend — B&S-7 Signifiance ────────────────────────────────────────── */
+.legend{
+  display:none;
+  align-items:center;
+  gap:1.5rem;
+  font-size:.8rem;
+  color:var(--clr-text-muted);
+  margin-bottom:1rem;
+  padding:.6rem 1rem;
+  background:var(--clr-surface);
+  border:1px solid var(--clr-border);
+  border-radius:var(--radius);
+  flex-wrap:wrap;
+}
+.leg-item{display:flex;align-items:center;gap:.45rem}
+.leg-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+
+/* Mock banner — B&S-7 Signifiance ──────────────────────────────────── */
+.mock-banner{
+  display:none;
+  background:rgba(210,153,34,.08);
+  border:1px solid rgba(210,153,34,.3);
+  border-radius:var(--radius);
+  padding:.6rem 1rem;
+  font-size:.8rem;
+  color:var(--clr-warning);
+  margin-bottom:1rem;
+  align-items:center;gap:.5rem;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────── */
+footer{
+  text-align:center;
+  padding:1.5rem;
+  font-size:.78rem;
+  color:var(--clr-text-muted);
+  border-top:1px solid var(--clr-border);
+}
+
+/* ─── Responsive — B&S-4 Adaptabilité ──────────────────────────────── */
+@media(max-width:680px){
+  .stepper{flex-direction:column;gap:.4rem}
+  .step:first-child{border-radius:var(--radius) var(--radius) 0 0}
+  .step:last-child{border-radius:0 0 var(--radius) var(--radius)}
+  .step:not(:last-child)::after{display:none}
+  .images-grid{grid-template-columns:1fr}
+  .app-header .logo{font-size:1.1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     EN-TÊTE  — B&S-6 Homogénéité, B&S-8 Compatibilité
+     ══════════════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <div class="logo">Neuro<span>Scan</span> Vision</div>
+  <span style="color:var(--clr-text-muted);font-size:.82rem">
+    Outil d'aide à la visualisation oncologique
+  </span>
+  <span class="server-badge" id="serverBadge">Connexion…</span>
+</header>
+
+<main>
+
+  <!-- Avertissement médical — B&S-8 Compatibilité, B&S-7 Signifiance -->
+  <div class="disclaimer">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zM8 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+    </svg>
+    <span>
+      <strong>Prototype académique d'aide à la visualisation</strong> — 
+      Cet outil n'est pas un dispositif médical certifié. Les résultats présentés 
+      sont destinés à l'analyse exploratoire et ne se substituent en aucun cas à 
+      un diagnostic établi par un professionnel de santé qualifié.
+    </span>
+  </div>
+
+  <!-- ══ STEPPER ══════════════════════════════════════════════════════
+       B&S-1 Guidage : étapes numérotées, état visible
+       ══════════════════════════════════════════════════════════════════ -->
+  <nav class="stepper" aria-label="Étapes d'analyse">
+    <div class="step active" id="step1">
+      <span class="num">1</span>
+      <span>Importer l'image</span>
+    </div>
+    <div class="step" id="step2">
+      <span class="num">2</span>
+      <span>Classification</span>
+    </div>
+    <div class="step" id="step3">
+      <span class="num">3</span>
+      <span>Segmentation</span>
+    </div>
+  </nav>
+
+  <!-- ══ ZONE D'IMPORT ════════════════════════════════════════════════
+       B&S-1 Guidage : instructions claires
+       B&S-3 Contrôle explicite : actions explicites (drop / sélection)
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="upload-card" id="dropZone" role="button"
+       tabindex="0" aria-label="Zone de dépôt d'image médicale">
+    <input type="file" id="fileInput" accept="image/*"
+           aria-label="Sélectionner une image médicale"/>
+    <span class="upload-icon">🧠</span>
+    <div style="font-size:1rem;font-weight:600">
+      Déposez une image IRM / scanner ici
+    </div>
+    <div class="upload-hint">
+      ou cliquez pour sélectionner un fichier &nbsp;•&nbsp;
+      Formats acceptés : JPEG, PNG, BMP, TIFF
+    </div>
+
+    <!-- Aperçu fichier sélectionné — B&S-7 Signifiance -->
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" src="" alt="Aperçu de l'image sélectionnée"/>
+      <div class="preview-info">
+        <div class="fname" id="previewName">—</div>
+        <div class="fsize" id="previewSize">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Erreur validation — B&S-5 Gestion des erreurs -->
+  <div class="error-box" id="errorBox" role="alert" aria-live="assertive">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.75 3.75a.75.75 0 0 1 1.5 0v4a.75.75 0 0 1-1.5 0v-4zm.75 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+    </svg>
+    <span id="errorMsg">Erreur inconnue.</span>
+  </div>
+
+  <!-- Boutons — B&S-3 Contrôle explicite -->
+  <div class="actions">
+    <button class="btn btn-primary" id="analyzeBtn" disabled
+            aria-label="Lancer l'analyse de l'image">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM5 8l3-3 3 3-3 3-3-3z"/>
+      </svg>
+      Analyser
+    </button>
+    <button class="btn btn-ghost" id="resetBtn"
+            aria-label="Réinitialiser et charger une nouvelle image">
+      ↺ &nbsp;Nouvelle image
+    </button>
+  </div>
+
+  <!-- Chargement — B&S-1 Guidage : état explicite -->
+  <div class="loader-wrap" id="loaderWrap" role="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loader-label" id="loaderLabel">Analyse en cours…</div>
+  </div>
+
+  <!-- ══ RÉSULTATS ════════════════════════════════════════════════════
+       Affichage progressif — B&S-2 Charge de travail
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="result-section" id="resultSection" aria-live="polite">
+
+    <!-- Badge mock — B&S-7 Signifiance -->
+    <div class="mock-banner" id="mockBanner">
+      ⚠️&nbsp; <strong>Mode démo</strong> — Les résultats sont simulés 
+      (Keras/TensorFlow non disponible ou modèles non chargés).
+    </div>
+
+    <!-- Verdict principal — B&S-7 Signifiance, B&S-4 Adaptabilité -->
+    <div class="verdict" id="verdictBox">
+      <div class="verdict-icon" id="verdictIcon">❓</div>
+      <div>
+        <div class="verdict-title" id="verdictTitle">—</div>
+        <div class="verdict-sub" id="verdictSub">—</div>
+      </div>
+    </div>
+
+    <!-- Barres de scores — B&S-7 Signifiance -->
+    <div class="scores-card" id="scoresCard">
+      <h3>Probabilités par classe</h3>
+      <div id="scoresBody"></div>
+    </div>
+
+    <!-- Légende masque — B&S-7 Signifiance -->
+    <div class="legend" id="maskLegend">
+      <span>Légende masque de segmentation :</span>
+      <div class="leg-item">
+        <div class="leg-swatch" style="background:#ff4d4d;opacity:.9"></div>
+        Probabilité tumorale élevée
+      </div>
+      <div class="leg-item">
+        <div class="leg-swatch" style="background:#ff8c00;opacity:.7"></div>
+        Probabilité tumorale modérée
+      </div>
+      <div class="leg-item">
+        <div class="leg-swatch" style="background:#222;border:1px solid #444"></div>
+        Tissu sain / bruit
+      </div>
+    </div>
+
+    <!-- Contrôle opacité — B&S-3 Contrôle explicite -->
+    <div class="overlay-controls" id="overlayControls">
+      <label for="opacitySlider">Opacité superposition :</label>
+      <input type="range" id="opacitySlider" min="0" max="100" value="80"
+             aria-label="Régler l'opacité du masque de segmentation"/>
+      <span class="pct-display" id="opacityDisplay">80%</span>
+    </div>
+
+    <!-- Images — B&S-4 Adaptabilité : grille 1 colonne si normal, 2 si cancer -->
+    <div class="images-grid" id="imagesGrid">
+      <div class="img-card" id="origCard">
+        <div class="img-card-header">
+          📷 &nbsp;Image originale
+          <span style="margin-left:auto;color:var(--clr-text-muted);font-weight:400"
+                id="origLabel">—</span>
+        </div>
+        <img id="origImg" src="" alt="Image médicale originale"/>
+      </div>
+      <div class="img-card" id="segCard" style="display:none">
+        <div class="img-card-header">
+          🔴 &nbsp;Segmentation tumorale
+          <span style="margin-left:auto;color:var(--clr-text-muted);font-weight:400"
+                id="maskConfLabel">—</span>
+        </div>
+        <img id="segImg" src="" alt="Superposition du masque de segmentation"/>
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+<footer>
+  NeuroScan Vision &nbsp;•&nbsp; Prototype académique &nbsp;•&nbsp;
+  EfficientNetB0 (classification) + TransUNet (segmentation) &nbsp;•&nbsp;
+  Non certifié CE / FDA
+</footer>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     B&S-1  Guidage        : stepper, états loader/résultats
+     B&S-2  Charge de travail : fetch unique, affichage progressif
+     B&S-3  Contrôle       : analyzeBtn, resetBtn, opacitySlider
+     B&S-4  Adaptabilité   : grille 1 / 2 colonnes selon résultat
+     B&S-5  Gestion erreurs: try/catch, messages explicites
+     B&S-6  Homogénéité    : fonctions helpers centralisées
+     B&S-7  Signifiance    : labels lisibles, barres colorées
+     B&S-8  Compatibilité  : vocabulaire médical, parcours logique
+     ══════════════════════════════════════════════════════════════════════ -->
+<script>
+// ─── Références DOM ────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const dropZone       = $('dropZone');
+const fileInput      = $('fileInput');
+const previewWrap    = $('previewWrap');
+const previewImg     = $('previewImg');
+const previewName    = $('previewName');
+const previewSize    = $('previewSize');
+const analyzeBtn     = $('analyzeBtn');
+const resetBtn       = $('resetBtn');
+const loaderWrap     = $('loaderWrap');
+const loaderLabel    = $('loaderLabel');
+const errorBox       = $('errorBox');
+const errorMsg       = $('errorMsg');
+const resultSection  = $('resultSection');
+const verdictBox     = $('verdictBox');
+const verdictIcon    = $('verdictIcon');
+const verdictTitle   = $('verdictTitle');
+const verdictSub     = $('verdictSub');
+const scoresBody     = $('scoresBody');
+const origImg        = $('origImg');
+const origLabel      = $('origLabel');
+const segCard        = $('segCard');
+const segImg         = $('segImg');
+const maskConfLabel  = $('maskConfLabel');
+const imagesGrid     = $('imagesGrid');
+const overlayControls= $('overlayControls');
+const opacitySlider  = $('opacitySlider');
+const opacityDisplay = $('opacityDisplay');
+const maskLegend     = $('maskLegend');
+const mockBanner     = $('mockBanner');
+const serverBadge    = $('serverBadge');
+
+// Stocke l'image originale encodée (pour le slider d'opacité)
+let _origB64 = null;
+let _overlayB64 = null;
+
+// ─── Vérification statut serveur — B&S-1 Guidage ───────────────────────
+async function checkServerStatus() {
+  try {
+    const r = await fetch('/status');
+    const data = await r.json();
+    if (data.mode === 'mock') {
+      serverBadge.textContent = '⚠ Mode démo';
+      serverBadge.className = 'server-badge mock';
+    } else {
+      serverBadge.textContent = '✓ Production';
+      serverBadge.className = 'server-badge prod';
+    }
+  } catch {
+    serverBadge.textContent = '✗ Hors ligne';
+    serverBadge.className = 'server-badge';
+  }
+}
+checkServerStatus();
+
+// ─── Stepper — B&S-1 Guidage ────────────────────────────────────────────
+function setStep(active) {
+  [1, 2, 3].forEach(n => {
+    const el = $('step' + n);
+    el.classList.remove('active', 'done');
+    if (n < active)  el.classList.add('done');
+    if (n === active) el.classList.add('active');
+  });
+}
+
+// ─── Affichage erreur — B&S-5 Gestion des erreurs ───────────────────────
+function showError(msg) {
+  errorBox.style.display  = 'flex';
+  errorMsg.textContent    = msg;
+  loaderWrap.style.display = 'none';
+  resultSection.style.display = 'none';
+}
+function clearError() {
+  errorBox.style.display = 'none';
+  errorMsg.textContent   = '';
+}
+
+// ─── Reset — B&S-3 Contrôle explicite ───────────────────────────────────
+function resetAll() {
+  fileInput.value         = '';
+  previewWrap.style.display = 'none';
+  previewImg.src          = '';
+  analyzeBtn.disabled     = true;
+  resultSection.style.display = 'none';
+  loaderWrap.style.display = 'none';
+  overlayControls.style.display = 'none';
+  maskLegend.style.display = 'none';
+  mockBanner.style.display = 'none';
+  segCard.style.display   = 'none';
+  imagesGrid.classList.remove('single');
+  _origB64 = null;
+  _overlayB64 = null;
+  clearError();
+  setStep(1);
+}
+
+// ─── Aperçu fichier — B&S-7 Signifiance ─────────────────────────────────
+function handleFile(file) {
+  if (!file) return;
+  clearError();
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    previewImg.src = e.target.result;
+    previewName.textContent = file.name;
+    previewSize.textContent = formatSize(file.size);
+    previewWrap.style.display = 'flex';
+    analyzeBtn.disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024)        return bytes + ' o';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
+}
+
+// ─── Drag & drop — B&S-1 Guidage, B&S-3 Contrôle explicite ─────────────
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) { fileInput.files = e.dataTransfer.files; handleFile(f); }
+});
+fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+resetBtn.addEventListener('click', resetAll);
+
+// ─── ANALYSE — Pipeline principal ────────────────────────────────────────
+analyzeBtn.addEventListener('click', async () => {
+  if (!fileInput.files.length) return;
+  clearError();
+  resultSection.style.display = 'none';
+  loaderWrap.style.display    = 'flex';
+  loaderLabel.textContent     = '⏳ Étape 2 — Classification en cours…';
+  setStep(2);
+  analyzeBtn.disabled = true;
+
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+
+  try {
+    const res = await fetch('/analyze', { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (!res.ok) {
+      // B&S-5 Gestion erreurs : message serveur transmis à l'utilisateur
+      const detail = data.detail || {};
+      showError(detail.message || `Erreur ${res.status} — veuillez réessayer.`);
+      analyzeBtn.disabled = false;
+      return;
+    }
+
+    // Segmentation (affichage loader étape 3 si applicable)
+    if (!data.is_normal && data.overlay_image) {
+      loaderLabel.textContent = '⏳ Étape 3 — Segmentation tumorale…';
+      setStep(3);
+      await new Promise(r => setTimeout(r, 300)); // pause UX (délai perceptible)
+    }
+
+    loaderWrap.style.display = 'none';
+    renderResults(data);
+    analyzeBtn.disabled = false;
+
+  } catch (err) {
+    showError('Impossible de contacter le serveur. Vérifiez qu\'uvicorn est démarré.');
+    analyzeBtn.disabled = false;
+  }
+});
+
+// ─── Rendu résultats — B&S-7 Signifiance, B&S-4 Adaptabilité ────────────
+function renderResults(d) {
+  // Mock banner
+  mockBanner.style.display = d.mock_mode ? 'flex' : 'none';
+
+  // Verdict — B&S-7 Signifiance
+  verdictBox.className = 'verdict';
+  if (d.uncertain) {
+    verdictBox.classList.add('uncertain');
+    verdictIcon.textContent = '⚠️';
+    verdictTitle.textContent = `Résultat incertain (${d.confidence}% de confiance)`;
+    verdictSub.textContent =
+      `La confiance est inférieure au seuil requis. `+
+      `Classe la plus probable : ${d.predicted_class}. `+
+      `Un examen complémentaire est recommandé.`;
+  } else if (d.is_normal) {
+    verdictBox.classList.add('normal');
+    verdictIcon.textContent = '✅';
+    verdictTitle.textContent = `Aucune lésion cancéreuse détectée`;
+    verdictSub.textContent =
+      `Classification : ${d.predicted_class} — Confiance : ${d.confidence}%. `+
+      `La segmentation n'a pas été exécutée.`;
+    setStep(2); // B&S-1 : étape 3 non atteinte (cas normal)
+  } else {
+    verdictBox.classList.add('cancer');
+    verdictIcon.textContent = '🔴';
+    verdictTitle.textContent = `Anomalie détectée : ${d.predicted_class}`;
+    verdictSub.textContent =
+      `Confiance : ${d.confidence}%. `+
+      `La segmentation a été exécutée automatiquement pour localiser la zone d'intérêt.`;
+    setStep(3);
+  }
+
+  // Barres de scores — B&S-7 Signifiance
+  scoresBody.innerHTML = '';
+  d.scores.forEach((s, i) => {
+    const isTop = i === 0;
+    scoresBody.insertAdjacentHTML('beforeend', `
+      <div class="score-row">
+        <span class="score-label" title="${s.class}">${s.class}</span>
+        <div class="score-bar-wrap" role="meter"
+             aria-valuenow="${s.probability}" aria-valuemin="0" aria-valuemax="100">
+          <div class="score-bar${isTop ? ' top' : ''}"
+               style="width:${s.probability}%"></div>
+        </div>
+        <span class="score-pct">${s.probability}%</span>
+      </div>
+    `);
+  });
+
+  // Images — B&S-4 Adaptabilité
+  _origB64 = d.original_image;
+  _overlayB64 = d.overlay_image;
+  origImg.src = 'data:image/jpeg;base64,' + d.original_image;
+  origLabel.textContent = d.predicted_class;
+
+  if (d.overlay_image && !d.is_normal) {
+    // Vue côte à côte (cancer)
+    imagesGrid.classList.remove('single');
+    segCard.style.display = 'block';
+    segImg.src = 'data:image/png;base64,' + d.overlay_image;
+    maskConfLabel.textContent =
+      d.mask_confidence !== null ? `Densité moy. : ${d.mask_confidence}%` : '';
+
+    // Contrôle opacité — B&S-3 Contrôle explicite
+    overlayControls.style.display = 'flex';
+    maskLegend.style.display = 'flex';
+    opacitySlider.value = 80;
+    opacityDisplay.textContent = '80%';
+    segImg.style.opacity = 0.8;
+  } else {
+    // Vue simple (cas normal) — B&S-2 Charge de travail
+    imagesGrid.classList.add('single');
+    segCard.style.display = 'none';
+    overlayControls.style.display = 'none';
+    maskLegend.style.display = 'none';
+  }
+
+  resultSection.style.display = 'block';
+  resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─── Slider opacité — B&S-3 Contrôle explicite ──────────────────────────
+opacitySlider.addEventListener('input', () => {
+  const v = opacitySlider.value;
+  opacityDisplay.textContent = v + '%';
+  segImg.style.opacity = v / 100;
+});
+</script>
+</body>
+</html>
